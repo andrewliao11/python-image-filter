@@ -8,30 +8,38 @@ from struct import unpack
 from scipy import interpolate
 
 from PIL import Image
-import numpy
+import numpy, random
 import scipy
-
+import pdb
 import sys
 
-class Filter:
+class rand_Filter:
 
-  def __init__(self, acv_file_path, name):
-    self.name = name
-    with open(acv_file_path, 'rb') as acv_file:
-      self.curves = self._read_curves(acv_file)
+  def __init__(self):
+    self.curves = self._read_curves()
     self.polynomials = self._find_coefficients()
   
-  def _read_curves(self, acv_file):
-    _, nr_curves = unpack('!hh', acv_file.read(4))
+  def _random_curve(self, nr_curves):
     curves = []
-    for i in xrange(0, nr_curves):
-      curve = []
-      num_curve_points, = unpack('!h', acv_file.read(2))
-      for j in xrange(0, num_curve_points):
-        y, x = unpack('!hh', acv_file.read(4))
-        curve.append((x,y))
+    for i in range(nr_curves-1):
+      curve = [(0,0)]
+      # exlcude the 0 and 255
+      _x = numpy.sort(random.sample(range(1, 255), 32))
+      _y = numpy.sort(random.sample(range(1, 255), 32))
+      #_x = numpy.sort(numpy.random.randint(1, 255, 2))
+      #_y = numpy.sort(numpy.random.randint(1, 255, 2))
+      # _x[0] and _x[1] can't be the same
+      
+      curve.append((_x[0], _y[0]))
+      curve.append((_x[1], _y[1]))
+      curve.append((255,255))
       curves.append(curve)
+    curves.append([(255,255)])
+    return curves
 
+  def _read_curves(self):
+    nr_curves = 5
+    curves = self._random_curve(nr_curves)
     return curves
 
   def _find_coefficients(self):
@@ -58,16 +66,16 @@ class Filter:
 class FilterManager:
 
   def __init__(self):
-    self.filters = {}
-    #add some stuff here
+    self.filters = None
 
-  def add_filter(self,filter_obj):
+  def set_filter(self,filter_obj):
     # Overwrites if such a filter already exists
     # NOTE: Fix or not to fix?
-    self.filters[filter_obj.name] = filter_obj
+    self.filters = filter_obj
 
-  def apply_filter(self,filter_name,image_array):
+  def apply_filter(self, image_array):
 
+    assert self.filters != None
     if image_array.ndim < 3:
       raise Exception('Photos must be in color, meaning at least 3 channels')
     else:
@@ -76,7 +84,7 @@ class FilterManager:
         return p_arr 
 
       # NOTE: Assumes that image_array is a numpy array
-      image_filter = self.filters[filter_name]
+      image_filter = self.filters
       # NOTE: What happens if filter does not exist?
       width,height,channels = image_array.shape
       filter_array = numpy.zeros((width, height, 3), dtype=float) 
@@ -101,20 +109,20 @@ if __name__ == '__main__':
   if len(sys.argv) < 3:
     print "Wrong number of arguments"
     print """  Usage: \
-          python filter.py [curvefile] [imagefile] """
+          python filter.py [imagefile] [name]"""
   else:
-    img_filter = Filter(sys.argv[1], 'crgb')
+    img_filter = rand_Filter()
+    
+    im = Image.open(sys.argv[1])
 
-    im = Image.open(sys.argv[2])
-
-    im.show()
+    #im.show()
 
     image_array = numpy.array(im)
 
     filter_manager = FilterManager()
-    filter_manager.add_filter(img_filter)
+    filter_manager.set_filter(img_filter)
 
-    filter_array = filter_manager.apply_filter('crgb', image_array)
+    filter_array = filter_manager.apply_filter(image_array)
     im = Image.fromarray(filter_array)
-    im.save('temp.png')
-    im.show() 
+    im.save(sys.argv[2]+'.png')
+    #im.show() 
